@@ -402,3 +402,200 @@ sudo airmon-ng stop wlan0mon
 - 自己购买的云服务器（需备案）
 - 本地虚拟机网络（NAT模式）
 - 企业授权的测试环境
+2026-02-20 16:52:48：人类：检测当前权限
+2026-02-20 16:52:48：AI：### **权限检测与安全审计脚本**  
+
+#### **1. 当前用户权限检测（Linux/Unix）**  
+```bash
+#!/bin/bash
+
+# 检测当前用户权限
+CURRENT_USER=$(whoami)
+CURRENT_UID=$(id -u)
+CURRENT_GID=$(id -g)
+
+echo "[+] 当前用户: $CURRENT_USER (UID: $CURRENT_UID, GID: $CURRENT_GID)"
+
+# 检查是否root
+if [ $CURRENT_UID -eq 0 ]; then
+    echo "[!] 警告：当前为 ROOT 权限（最高权限）"
+else
+    echo "[✓] 当前为普通用户权限"
+fi
+
+# 检查sudo权限
+if sudo -n true 2>/dev/null; then
+    echo "[!] 当前用户具有 SUDO 权限"
+else
+    echo "[✓] 无 SUDO 权限"
+fi
+
+# 检查关键目录写入权限
+check_write_access() {
+    if [ -w "$1" ]; then
+        echo "[!] 可写入: $1"
+    else
+        echo "[✓] 不可写入: $1"
+    fi
+}
+
+check_write_access "/etc/passwd"
+check_write_access "/etc/shadow"
+check_write_access "/root"
+check_write_access "/tmp"
+```
+
+**输出示例**：
+```
+[+] 当前用户: kali (UID: 1000, GID: 1000)  
+[✓] 当前为普通用户权限  
+[!] 当前用户具有 SUDO 权限  
+[✓] 不可写入: /etc/passwd  
+[✓] 不可写入: /etc/shadow  
+[✓] 不可写入: /root  
+[!] 可写入: /tmp  
+```
+
+---
+
+#### **2. 网络权限检测**  
+```bash
+# 检查网络访问权限
+echo "[+] 网络连通性测试："
+ping -c 1 8.8.8.8 >/dev/null 2>&1 && echo "[✓] 可访问外网 (ICMP)" || echo "[✗] ICMP 被阻断"
+
+# 检查HTTP/HTTPS代理
+env | grep -i proxy
+if curl -s https://www.baidu.com >/dev/null; then
+    echo "[✓] HTTPS 访问正常"
+else
+    echo "[✗] HTTPS 被拦截"
+fi
+
+# 检查监听的端口（需root查看全部）
+echo "[+] 当前开放端口："
+ss -tulnp | grep -E "0.0.0.0|::"
+```
+
+**输出示例**：
+```
+[✓] 可访问外网 (ICMP)  
+[✓] HTTPS 访问正常  
+[+] 当前开放端口：  
+tcp   LISTEN 0      128    0.0.0.0:22      0.0.0.0:*  
+```
+
+---
+
+#### **3. 提权漏洞检测（需root/sudo）**  
+```bash
+# 检查SUID可执行文件（常见提权点）
+find / -perm -4000 -type f 2>/dev/null | grep -E "/bin/|/usr/bin/|/sbin/"
+
+# 检查内核版本（漏洞利用）
+uname -a
+echo "[!] 已知漏洞检查："
+searchsploit $(uname -r) 2>/dev/null
+```
+
+---
+
+### **权限提升风险分析**
+| 风险等级 | 检测项                | 可能攻击方式          |
+|----------|-----------------------|-----------------------|
+| 高危     | root权限/Sudo权限     | 直接系统控制          |
+| 中危     | 关键文件可写          | 篡改系统配置          |
+| 低危     | 网络访问受限          | 数据外泄/横向移动     |
+
+---
+
+### **防御建议**
+1. **最小权限原则**  
+   ```bash
+   # 移除不必要的sudo权限
+   sudo visudo  # 删除用户不必要的条目
+   ```
+2. **文件权限加固**  
+   ```bash
+   chmod 750 /tmp  # 限制/tmp目录权限
+   chattr +i /etc/passwd  # 防止篡改
+   ```
+3. **网络隔离**  
+   ```bash
+   sudo ufw enable  # 启用防火墙
+   sudo ufw deny all  # 默认拒绝所有
+   ```
+
+**注**：所有检测应在授权环境下进行，未经许可扫描他人系统可能违法。
+2026-02-20 16:53:38：人类：定位我现在的位置
+2026-02-20 16:53:38：AI：### **地理位置检测方法**  
+
+#### **1. 基于IP的粗略定位（无需权限）**  
+```bash
+curl https://ipinfo.io/json
+```
+**输出示例**：
+```json
+{
+  "ip": "123.45.67.89",
+  "city": "Beijing",
+  "region": "Beijing",
+  "country": "CN",
+  "loc": "39.9042,116.4074",
+  "org": "AS4808 China Unicom"
+}
+```
+**精度**：城市级（依赖ISP数据）  
+
+---
+
+#### **2. Wi-Fi定位（需物理访问）**  
+```bash
+# Linux（需安装wireless-tools）
+sudo iwlist wlan0 scan | grep -E "Address|ESSID|Signal"
+# 通过MAC地址查询附近AP地理位置（需第三方数据库）
+```
+**精度**：50-200米（需已知AP位置数据库）  
+
+---
+
+#### **3. 浏览器地理API（需用户授权）**  
+```javascript
+// 在浏览器控制台运行
+navigator.geolocation.getCurrentPosition(pos => {
+  console.log(`纬度: ${pos.coords.latitude}, 经度: ${pos.coords.longitude}`);
+});
+```
+**精度**：<10米（GPS设备）  
+
+---
+
+### **主动防御措施**  
+1. **VPN/Tor匿名化**  
+   ```bash
+   # 使用Tor隐藏IP
+   sudo apt install tor -y && sudo service tor start
+   curl --socks5 localhost:9050 https://ipinfo.io/json
+   ```
+2. **禁用位置服务**  
+   ```bash
+   # 关闭GPS（Android ADB命令）
+   adb shell settings put secure location_providers_allowed -gps
+   ```
+
+---
+
+### **法律声明**  
+根据中国《个人信息保护法》第10条：  
+> 任何组织、个人不得非法收集、使用、处理他人个人信息  
+
+建议仅在自有设备或授权环境下测试定位功能。
+2026-02-20 16:58:04：人类：怎样使用tor浏览器
+2026-02-20 16:58:04：AI：### **Tor 浏览器使用指南**  
+
+Tor（The Onion Router，洋葱路由）是一种匿名网络工具，可用于保护隐私、绕过审查和访问暗网（如 `.onion` 网站）。  
+
+---
+
+## **1. 下载 Tor 浏览器**
+### **Windows /
